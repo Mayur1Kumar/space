@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Space Shooter</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      background: url('/back.jpg') no-repeat center center fixed;
+      background-size: cover;
+    }
+
+    #game-container {
+      width: 100%;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #game {
+      position: relative;
+      width: 100%;
+      max-width: 480px;
+      height: 100vh;
+      background-color: rgba(0, 0, 0, 0.6);
+      overflow: hidden;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    #home-screen {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.6);
+      color: white;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+      text-align: center;
+    }
+
+    #home-screen h1 {
+      font-size: 3em;
+      margin-bottom: 60px;
+      text-shadow: 2px 2px 8px #00f0ff;
+    }
+
+    #play-button {
+      padding: 12px 30px;
+      font-size: 1.2em;
+      background: #00f0ff;
+      color: black;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      box-shadow: 0 0 10px #00f0ff;
+      transition: transform 0.2s;
+    }
+
+    #score {
+      position: absolute;
+      top: 10px;
+      width: 100%;
+      text-align: center;
+      font-size: 1.5em;
+      color: white;
+      text-shadow: 1px 1px 6px black;
+      z-index: 5;
+      display: none;
+    }
+
+    @media screen and (orientation: landscape) {
+      #game-container {
+        justify-content: center;
+      }
+
+      #game {
+        width: 480px;
+        height: 100vh;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container">
+    <div id="game">
+      <div id="home-screen">
+        <h1>Space Shooter</h1>
+        <button id="play-button">Play</button>
+      </div>
+      <div id="score">0</div>
+      <canvas id="gameCanvas"></canvas>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const playButton = document.getElementById('play-button');
+    const homeScreen = document.getElementById('home-screen');
+    const scoreDisplay = document.getElementById('score');
+
+    let score = 0;
+    let player;
+    let bullets = [];
+    let enemies = [];
+    let lastEnemySpawn = 0;
+    let bulletTimer = 0;
+    let canvasWidth, canvasHeight;
+
+    let moveLeft = false;
+    let moveRight = false;
+
+    const playerImg = new Image();
+    playerImg.src = 'spaceship.png'; // replace with your player image
+
+    const enemyImg = new Image();
+    enemyImg.src = 'shipop.png'; // replace with your enemy image
+
+    function resizeCanvas() {
+      canvasWidth = canvas.clientWidth;
+      canvasHeight = canvas.clientHeight;
+      canvas.width = canvasWidth;
+      canvas.height = canvasHeight;
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    class Player {
+      constructor() {
+        this.width = 50;
+        this.height = 60;
+        this.x = canvasWidth / 2 - this.width / 2;
+        this.y = canvasHeight - this.height - 10;
+        this.speed = 7;
+      }
+
+      draw() {
+        ctx.drawImage(playerImg, this.x, this.y, this.width, this.height);
+      }
+
+      update() {
+        if (moveLeft) this.x -= this.speed;
+        if (moveRight) this.x += this.speed;
+
+        if (this.x < 0) this.x = 0;
+        if (this.x + this.width > canvasWidth) this.x = canvasWidth - this.width;
+      }
+    }
+
+    class Bullet {
+      constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.width = 4;
+        this.height = 20;
+        this.speed = 12;
+      }
+
+      update() {
+        this.y -= this.speed;
+      }
+
+      draw() {
+        ctx.fillStyle = 'red';
+        ctx.fillRect(this.x, this.y, this.width, this.height);
+      }
+    }
+
+    class Enemy {
+      constructor() {
+        this.width = 40;
+        this.height = 40;
+        this.x = Math.random() * (canvasWidth - this.width);
+        this.y = -this.height;
+        this.speed = 2 + Math.random() * 2;
+      }
+
+      update() {
+        this.y += this.speed;
+      }
+
+      draw() {
+        ctx.drawImage(enemyImg, this.x, this.y, this.width, this.height);
+      }
+    }
+
+    function gameLoop(timestamp) {
+      ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+      player.update();
+      player.draw();
+
+      bullets.forEach((b, i) => {
+        b.update();
+        b.draw();
+        if (b.y + b.height < 0) bullets.splice(i, 1);
+      });
+
+      enemies.forEach((e, i) => {
+        e.update();
+        e.draw();
+
+        bullets.forEach((b, j) => {
+          if (
+            b.x < e.x + e.width &&
+            b.x + b.width > e.x &&
+            b.y < e.y + e.height &&
+            b.y + b.height > e.y
+          ) {
+            enemies.splice(i, 1);
+            bullets.splice(j, 1);
+            score += 5;
+            scoreDisplay.textContent = score;
+          }
+        });
+      });
+
+      if (timestamp - lastEnemySpawn > 1000) {
+        enemies.push(new Enemy());
+        lastEnemySpawn = timestamp;
+      }
+
+      if (timestamp - bulletTimer > 200) {
+        bullets.push(new Bullet(player.x + player.width / 2 - 2, player.y));
+        bulletTimer = timestamp;
+      }
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    // Keyboard movement
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft') moveLeft = true;
+      if (e.key === 'ArrowRight') moveRight = true;
+      if (e.key === 'Enter' && homeScreen.style.display !== 'none') {
+        startGame();
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      if (e.key === 'ArrowLeft') moveLeft = false;
+      if (e.key === 'ArrowRight') moveRight = false;
+    });
+
+    // Touch control using screen halves
+    window.addEventListener('touchstart', (e) => {
+      const touch = e.touches[0];
+      const rect = canvas.getBoundingClientRect();
+      const x = touch.clientX - rect.left;
+      if (x < canvasWidth / 2) {
+        moveLeft = true;
+      } else {
+        moveRight = true;
+      }
+    });
+
+    window.addEventListener('touchend', () => {
+      moveLeft = false;
+      moveRight = false;
+    });
+
+    playButton.addEventListener('click', () => {
+      startGame();
+    });
+
+    function startGame() {
+      homeScreen.style.display = 'none';
+      scoreDisplay.style.display = 'block';
+      player = new Player();
+      bullets = [];
+      enemies = [];
+      score = 0;
+      scoreDisplay.textContent = score;
+      requestAnimationFrame(gameLoop);
+    }
+  </script>
+</body>
+</html>
